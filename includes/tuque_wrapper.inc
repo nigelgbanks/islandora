@@ -8,29 +8,8 @@
  * @todo Overload functions and apply pre/post hooks.
  */
 
-$islandora_module_path = drupal_get_path('module', 'islandora');
-@include_once 'sites/all/libraries/tuque/implementations/fedora3/Datastream.php';
-@include_once 'sites/all/libraries/tuque/implementations/fedora4/FedoraApi.php';
-@include_once 'sites/all/libraries/tuque/implementations/fedora4/FedoraApiSerializer.php';
-@include_once 'sites/all/libraries/tuque/implementations/fedora4/Object.php';
-@include_once 'sites/all/libraries/tuque/implementations/fedora3/RepositoryConnection.php';
-@include_once 'sites/all/libraries/tuque/Cache.php';
-@include_once 'sites/all/libraries/tuque/RepositoryException.php';
-@include_once 'sites/all/libraries/tuque/implementations/fedora4/Repository.php';
-@include_once 'sites/all/libraries/tuque/implementations/fedora3/FedoraRelationships.php';
-@include_once 'sites/all/libraries/tuque/RepositoryConfigInterface.php';
-
-
-@include_once "$islandora_module_path/implementations/fedora3/Datastream.php";
-@include_once "$islandora_module_path/implementations/fedora4/FedoraApi.php";
-@include_once "$islandora_module_path/implementations/fedora4/FedoraApiSerializer.php";
-@include_once "$islandora_module_path/implementations/fedora4/Object.php";
-@include_once "$islandora_module_path/implementations/fedora3/RepositoryConnection.php";
-@include_once "$islandora_module_path/Cache.php";
-@include_once "$islandora_module_path/RepositoryException.php";
-@include_once "$islandora_module_path/implementations/fedora4/Repository.php";
-@include_once "$islandora_module_path/implementations/fedora3/FedoraRelationships.php";
-@include_once "$islandora_module_path/RepositoryConfigInterface.php";
+// Do this until we expose these in a module or library.
+@include_once 'sites/all/libraries/tuque/Repository.php';
 
 /**
  * Allow modules to alter an object before a mutable event occurs.
@@ -72,17 +51,21 @@ function islandora_invoke_datastream_hooks($hook, array $models, $dsid) {
   return islandora_invoke_hook_list($hook, $refinements, array_slice(func_get_args(), 3));
 }
 
-class IslandoraFedoraRepository extends FedoraRepository {
-  protected $queryClass = 'IslandoraRepositoryQuery';
-  protected $newObjectClass = 'IslandoraNewFedoraObject';
-  protected $objectClass = 'IslandoraFedoraObject';
+
+/**
+ * Decorators the given repository with hooks.
+ */
+class IslandoraFedoraRepository extends Tuque\Repository {
+
+  protected $newObjectDecorator = 'IslandoraNewFedoraObject';
+  protected $objectDecorator = 'IslandoraFedoraObject';
 
   /**
    * Ingest the given object.
    *
    * @see FedoraRepository::ingestObject()
    */
-  public function ingestObject(AbstractObject &$object) {
+  public function ingestObject(Tuque\AbstractObject &$object) {
     $context = array(
       'action' => 'ingest',
       'block' => FALSE,
@@ -111,23 +94,17 @@ class IslandoraFedoraRepository extends FedoraRepository {
   }
 }
 
-class IslandoraRepositoryQuery extends RepositoryQuery {}
+/**
+ */
+class IslandoraFedoraObject extends Tuque\Object {
 
-class IslandoraNewFedoraObject extends NewFedoraObject {
-  protected $newFedoraDatastreamClass = 'IslandoraNewFedoraDatastream';
-  protected $fedoraDatastreamClass = 'IslandoraFedoraDatastream';
-  protected $fedoraRelsExtClass = 'IslandoraFedoraRelsExt';
-}
-
-class IslandoraFedoraObject extends FedoraObject {
-  protected $newFedoraDatastreamClass = 'IslandoraNewFedoraDatastream';
-  protected $fedoraDatastreamClass = 'IslandoraFedoraDatastream';
-  protected $fedoraRelsExtClass = 'IslandoraFedoraRelsExt';
+  protected $datastreamDecorator = 'IslandoraFedoraDatastream';
+  protected $relsExtDecorator = 'IslandoraFedoraRelsExt';
 
   /**
    * Ingest the given datastream.
    *
-   * @see FedoraObject::ingestDatastream()
+   * @see AbstractObject::ingestDatastream()
    */
   public function ingestDatastream(&$datastream) {
     $object = $datastream->parent;
@@ -155,21 +132,21 @@ class IslandoraFedoraObject extends FedoraObject {
   }
 }
 
-class IslandoraRepositoryConnection extends RepositoryConnection {}
-
+/**
+ * @todo Figure this shit out.
 class IslandoraFedoraApi extends Fedora4Api {
 
   /**
    * Instantiate a IslandoraFedoraApi object.
    *
    * @see FedoraApi::__construct()
-   */
+   *
   public function __construct(IslandoraRepositoryConnection $connection, FedoraApiSerializer $serializer = NULL) {
     if (!$serializer) {
       $serializer = new Fedora4ApiSerializer();
     }
     $this->a = new Fedora4ApiA($connection, $serializer);
-   $this->m = new IslandoraFedoraApiM($connection, $serializer);
+    $this->m = new IslandoraFedoraApiM($connection, $serializer);
     $this->connection = $connection;
   }
 }
@@ -185,7 +162,7 @@ class IslandoraFedoraApiM extends Fedora4ApiM {
    *   If the modify datastream request was block by some module.
    *
    * @see FedoraApiM::modifyDatastream
-   */
+   *
   public function modifyDatastream($pid, $dsid, $params = array()) {
     $object = islandora_object_load($pid);
     $datastream = $object[$dsid];
@@ -220,7 +197,6 @@ class IslandoraFedoraApiM extends Fedora4ApiM {
    * Update Fedora Object parameters.
    *
    * @see FedoraApiM::modifyObject
-   */
   public function modifyObject($pid, $params = NULL) {
     $object = islandora_object_load($pid);
     $context = array(
@@ -253,7 +229,7 @@ class IslandoraFedoraApiM extends Fedora4ApiM {
    * Purge a datastream from from Fedora.
    *
    * @see FedoraApiM::purgeDatastream
-   */
+
   public function purgeDatastream($pid, $dsid, $params = array()) {
     $object = islandora_object_load($pid);
     $context = array(
@@ -296,7 +272,7 @@ class IslandoraFedoraApiM extends Fedora4ApiM {
    * Purge an object.
    *
    * @see FedoraApiM::purgeObject
-   */
+
   public function purgeObject($pid, $log_message = NULL,$param=array()) {
     $object = islandora_object_load($pid);
     $context = array(
@@ -336,24 +312,4 @@ class IslandoraFedoraApiM extends Fedora4ApiM {
   }
 
 }
-
-class IslandoraSimpleCache extends SimpleCache {}
-
-class IslandoraNewFedoraDatastream extends NewFedoraDatastream {
-  protected $fedoraRelsIntClass = 'IslandoraFedoraRelsInt';
-  protected $fedoraDatastreamVersionClass = 'IslandoraFedoraDatastreamVersion';
-}
-
-class IslandoraFedoraDatastream extends FedoraDatastream {
-  protected $fedoraRelsIntClass = 'IslandoraFedoraRelsInt';
-  protected $fedoraDatastreamVersionClass = 'IslandoraFedoraDatastreamVersion';
-}
-
-class IslandoraFedoraDatastreamVersion extends FedoraDatastreamVersion {
-  protected $fedoraRelsIntClass = 'IslandoraFedoraRelsInt';
-  protected $fedoraDatastreamVersionClass = 'IslandoraFedoraDatastreamVersion';
-}
-
-class IslandoraFedoraRelsExt extends FedoraRelsExt {}
-
-class IslandoraFedoraRelsInt extends FedoraRelsInt {}
+*/

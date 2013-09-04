@@ -5,54 +5,9 @@
  * This file contains a class to include the Tuque php library.
  */
 
-$islandora_module_path = drupal_get_path('module', 'islandora');
-
-// Do this until we expose these in a module or library.
-@include_once 'sites/all/libraries/tuque/implementations/fedora3/Datastream.php';
-@include_once 'sites/all/libraries/tuque/implementations/fedora4/FedoraApi.php';
-@include_once 'sites/all/libraries/tuque/implementations/fedora4/FedoraApiSerializer.php';
-@include_once 'sites/all/libraries/tuque/implementations/fedora4/Object.php';
-@include_once 'sites/all/libraries/tuque/implementations/fedora3/RepositoryConnection.php';
-@include_once 'sites/all/libraries/tuque/Cache.php';
-@include_once 'sites/all/libraries/tuque/RepositoryException.php';
-@include_once 'sites/all/libraries/tuque/implementations/fedora4/Repository.php';
-@include_once 'sites/all/libraries/tuque/implementations/fedora3/FedoraRelationships.php';
-@include_once 'sites/all/libraries/tuque/RepositoryConfigInterface.php';
-
-
-@include_once "$islandora_module_path/implementations/fedora3/Datastream.php";
-@include_once "$islandora_module_path/implementations/fedora4/FedoraApi.php";
-@include_once "$islandora_module_path/implementations/fedora4/FedoraApiSerializer.php";
-@include_once "$islandora_module_path/implementations/fedora4/Object.php";
-@include_once "$islandora_module_path/implementations/fedora3/RepositoryConnection.php";
-@include_once "$islandora_module_path/Cache.php";
-@include_once "$islandora_module_path/RepositoryException.php";
-@include_once "$islandora_module_path/implementations/fedora4/Repository.php";
-@include_once "$islandora_module_path/implementations/fedora3/FedoraRelationships.php";
-@include_once "$islandora_module_path/RepositoryConfigInterface.php";
+require_once 'tuque_wrapper.inc';
 
 class IslandoraTuque {
-
-  /**
-   * Connection to the repository
-   *
-   * @var RepositoryConnection
-   */
-  public $connection = NULL;
-
-  /**
-   * The Fedora API we are using
-   *
-   * @var FedoraAPI
-   */
-  public $api = NULL;
-
-  /**
-   * The cache we use to connect.
-   *
-   * @var SimpleCache
-   */
-  public $cache = NULL;
 
   /**
    * The repository object.
@@ -70,6 +25,7 @@ class IslandoraTuque {
    *   The url to the fedora instance.
    */
   public function __construct($user = NULL, $url = NULL) {
+    module_load_include('inc', 'islandora', 'includes/tuque_wrapper.inc');
     if (!isset($user)) {
       global $user;
     }
@@ -88,23 +44,22 @@ class IslandoraTuque {
     }
 
     if (self::exists()) {
-      $repositoryConfig = new RepositoryConfig($url);
-      $this->connection = new IslandoraRepositoryConnection($repositoryConfig);
-      $this->connection->reuseConnection = TRUE;
-      $this->api = new IslandoraFedoraApi($this->connection);
-      $this->cache = new IslandoraSimpleCache();
-      $this->repository = new IslandoraFedoraRepository($this->api, $this->cache);
+      $config = new Tuque\RepositoryConfig($url, $user_string, $pass_string);
+      $this->repository = new IslandoraFedoraRepository($config);
     }
   }
 
   /**
    * Checks if the Connection class exists.
    *
+   * @todo Can we get rid of this?
+   *
    * @returns bool
    *   TRUE if the Connection class exists FALSE otherwise.
    */
   public static function exists() {
-    return class_exists('RepositoryConnection');
+    module_load_include('inc', 'islandora', 'includes/tuque_wrapper.inc');
+    return class_exists('Tuque\Repository');
   }
 
   /**
